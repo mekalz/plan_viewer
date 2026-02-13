@@ -2,6 +2,10 @@
 
 A browser-based viewer for Claude Code plans — view, annotate, and comment on plans directly from your browser.
 
+| | |
+|---|---|
+| ![Screenshot 1](screenshot-1.png) | ![Screenshot 2](screenshot-2.png) |
+
 ## How It Works
 
 ```
