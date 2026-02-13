@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan Viewer</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+
+<!-- Markdown & Mermaid rendering -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked-highlight/2.2.2/index.umd.min.js"></script>
+<script src="https://unpkg.com/beautiful-mermaid/dist/beautiful-mermaid.browser.global.js"></script>
+<link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
+
+<script>
+  if (localStorage.getItem('theme') === 'light')
+    document.documentElement.setAttribute('data-theme', 'light');
+</script>
+
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --bg-hover: #30363d;
+    --border-primary: #30363d;
+    --border-accent: #58a6ff;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-orange: #d29922;
+    --accent-red: #f85149;
+    --accent-purple: #bc8cff;
+    --accent-cyan: #39d353;
+    --comment-bg: #1c2333;
+    --sidebar-width: 300px;
+    --topbar-height: 56px;
+    --font-sans: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+
+  html[data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #f0f2f5;
+    --bg-hover: #e1e4e8;
+    --border-primary: #d0d7de;
+    --border-accent: #0969da;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --text-muted: #8c959f;
+    --accent-blue: #0969da;
+    --accent-green: #1a7f37;
+    --accent-orange: #bf8700;
+    --accent-red: #cf222e;
+    --accent-purple: #8250df;
+    --accent-cyan: #1a7f37;
+    --comment-bg: #f0f4f9;
+  }
+
+  html { font-size: 14px; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ===== TOP BAR ===== */
+  .topbar {
+    height: var(--topbar-height);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--accent-blue);
+    letter-spacing: -0.02em;
+  }
+  .topbar-logo svg { width: 24px; height: 24px; }
+  .topbar-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2s infinite;
+  }
+  .status-dot.disconnected { background: var(--accent-red); animation: none; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .theme-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .theme-switch-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1;
+  }
+  .theme-switch-track {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .theme-switch-track:hover {
+    border-color: var(--accent-blue);
+  }
+  .theme-switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .theme-switch-thumb svg {
+    width: 12px;
+    height: 12px;
+    color: #fff;
+  }
+  html[data-theme="light"] .theme-switch-thumb {
+    transform: translateX(20px);
+  }
+
+  /* ===== MAIN LAYOUT ===== */
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-primary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .plan-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .plan-item {
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 4px;
+  }
+  .plan-item:hover { background: var(--bg-tertiary); }
+  .plan-item.active { background: var(--bg-tertiary); border-left: 3px solid var(--accent-blue); }
+  .plan-item-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .plan-item-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .plan-item-meta .badge {
+    background: var(--accent-blue);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  /* ===== CONTENT AREA ===== */
+  .content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    height: 44px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .toolbar-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-family: var(--font-body);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .toolbar-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+  .toolbar-btn.primary {
+    background: var(--accent-blue);
+    color: #fff;
+    border-color: var(--accent-blue);
+  }
+  .toolbar-btn.primary:hover { opacity: 0.85; }
+  .toolbar-spacer { flex: 1; }
+  .toolbar-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  /* Markdown + Comment Container */
+  .split-view {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .markdown-pane {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 48px 80px;
+    scroll-behavior: smooth;
+  }
+  .comments-pane {
+    width: 420px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-primary);
+    overflow-y: auto;
+    padding: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ===== MARKDOWN RENDERED CONTENT ===== */
+  .md-content h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-primary);
+    color: var(--text-primary);
+  }
+  .md-content h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 32px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-primary);
+    color: var(--text-primary);
+  }
+  .md-content h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 24px 0 8px;
+    color: var(--text-primary);
+  }
+  .md-content p { margin: 8px 0; line-height: 1.7; color: var(--text-primary); }
+  .md-content ul, .md-content ol { margin: 8px 0; padding-left: 24px; }
+  .md-content li { margin: 4px 0; line-height: 1.6; }
+  .md-content code {
+    font-family: var(--font-sans);
+    font-size: 0.9em;
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .md-content pre {
+    margin: 16px 0;
+    border-radius: 8px;
+    overflow-x: auto;
+    background: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-primary);
+  }
+  .md-content pre code {
+    display: block;
+    padding: 16px;
+    background: transparent !important;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .md-content pre code.hljs {
+    background: transparent !important;
+    padding: 16px;
+  }
+  .md-content blockquote {
+    border-left: 3px solid var(--accent-blue);
+    padding: 8px 16px;
+    margin: 12px 0;
+    color: var(--text-secondary);
+    background: rgba(88, 166, 255, 0.05);
+    border-radius: 0 6px 6px 0;
+  }
+  .md-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  .md-content th, .md-content td {
+    border: 1px solid var(--border-primary);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .md-content th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+  }
+  .md-content hr {
+    border: none;
+    border-top: 1px solid var(--border-primary);
+    margin: 24px 0;
+  }
+  .md-content a { color: var(--accent-blue); text-decoration: none; }
+  .md-content a:hover { text-decoration: underline; }
+
+  /* Mermaid diagrams */
+  .md-content .mermaid {
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-primary);
+    text-align: center;
+  }
+  .md-content .mermaid svg { max-width: 100%; }
+
+  /* ===== LINE-LEVEL COMMENT MARKERS ===== */
+  .md-section {
+    position: relative;
+    padding-left: 32px;
+    border-left: 2px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .md-section:hover { border-left-color: var(--border-primary); }
+  .md-section:hover .comment-trigger { opacity: 1; }
+  .md-section.has-comments { border-left-color: var(--accent-orange); }
+
+  .comment-trigger {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--accent-blue);
+    background: var(--bg-primary);
+    color: var(--accent-blue);
+    font-size: 14px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s;
+    z-index: 5;
+  }
+  .comment-trigger:hover { transform: scale(1.2); background: var(--accent-blue); color: #fff; }
+  .comment-trigger.has-comments {
+    opacity: 1;
+    background: var(--accent-orange);
+    border-color: var(--accent-orange);
+    color: #fff;
+  }
+
+  /* ===== GLOBAL COMMENT CONTEXT PREVIEW ===== */
+  #globalCommentContext {
+    display: none;
+    font-size: 0.8rem;
+    color: var(--accent-orange);
+    font-style: italic;
+    padding: 6px 10px;
+    background: rgba(210, 153, 34, 0.08);
+    border-left: 3px solid var(--accent-orange);
+    border-radius: 0 4px 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #globalCommentContext.visible { display: block; }
+  .global-comment-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  /* ===== COMMENTS PANE ===== */
+  .comments-pane-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .global-comment-input {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .global-comment-input textarea {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 8px 10px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    resize: vertical;
+    outline: none;
+  }
+  .global-comment-input textarea:focus { border-color: var(--accent-blue); }
+  .global-comment-input button { align-self: flex-end; }
+
+  .comment-card {
+    position: relative;
+    background: var(--comment-bg);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    padding: 12px;
+    padding-right: 32px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s;
+  }
+  .comment-card-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    color: var(--accent-red);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+  }
+  .comment-card-delete:hover { opacity: 1; }
+  .comment-card:hover { border-color: var(--accent-blue); }
+  .comment-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .comment-type-badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .comment-type-badge.comment { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+  .comment-type-badge.suggestion { background: rgba(188,140,255,0.15); color: var(--accent-purple); }
+  .comment-type-badge.question { background: rgba(210,153,34,0.15); color: var(--accent-orange); }
+  .comment-type-badge.approve { background: rgba(63,185,80,0.15); color: var(--accent-green); }
+  .comment-type-badge.reject { background: rgba(248,81,73,0.15); color: var(--accent-red); }
+  .comment-card-section {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+  }
+  .comment-card-context {
+    font-size: 0.8rem;
+    color: var(--accent-orange);
+    font-style: italic;
+    padding: 6px 10px;
+    background: rgba(210, 153, 34, 0.08);
+    border-left: 3px solid var(--accent-orange);
+    border-radius: 0 4px 4px 0;
+    margin-top: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .comment-card-text {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 6px 0;
+    color: var(--text-primary);
+  }
+  .comment-card-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  .comment-card-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+  }
+  .comment-card-actions button {
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-primary);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .comment-card-actions button:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    gap: 16px;
+    padding: 40px;
+    text-align: center;
+  }
+  .empty-state svg { width: 64px; height: 64px; opacity: 0.3; }
+  .empty-state h3 { font-size: 1.2rem; color: var(--text-secondary); }
+  .empty-state p { font-size: 0.9rem; max-width: 400px; line-height: 1.6; }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--accent-green);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    z-index: 200;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .toast.visible { transform: translateY(0); opacity: 1; }
+
+  /* ===== TEXT-SELECTION HIGHLIGHTS ===== */
+  .text-selection-highlight {
+    background: rgba(210, 153, 34, 0.2);
+    border-bottom: 2px solid var(--accent-orange);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+  .text-selection-highlight:hover {
+    background: rgba(210, 153, 34, 0.35);
+  }
+
+  /* Floating tooltip above text selection */
+  .selection-tooltip {
+    position: fixed;
+    z-index: 150;
+    display: none;
+    background: var(--accent-blue);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    white-space: nowrap;
+    user-select: none;
+    transition: opacity 0.15s;
+  }
+  .selection-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--accent-blue);
+  }
+  .selection-tooltip:hover { opacity: 0.9; }
+  .selection-tooltip.visible { display: block; }
+
+  /* Selected text preview in comment form and sidebar cards */
+  .comment-selection-preview {
+    font-size: 0.8rem;
+    color: var(--accent-orange);
+    font-style: italic;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: rgba(210, 153, 34, 0.08);
+    border-left: 3px solid var(--accent-orange);
+    border-radius: 0 4px 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <img src="icon.svg" alt="Plan Viewer" width="24" height="24">
+    Plan Viewer
+  </div>
+  <div class="topbar-status">
+    <div class="theme-switch">
+      <span class="theme-switch-label">Dark</span>
+      <div class="theme-switch-track" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark theme">
+        <div class="theme-switch-thumb" id="themeThumb">
+          <svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </div>
+      </div>
+      <span class="theme-switch-label">Light</span>
+    </div>
+    <span id="sessionInfo" style="font-family: var(--font-sans); font-size: 0.78rem;"></span>
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Connected</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main-layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">📋 Plans</div>
+    <div class="plan-list" id="planList">
+      <div class="empty-state" style="padding: 20px;">
+        <p>No plans found. Plans will appear here when Claude Code creates them.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content-area" id="contentArea">
+    <div class="empty-state" id="emptyState">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <h3>Select a plan to review</h3>
+      <p>Choose a plan from the sidebar, or wait for Claude Code to generate one. Plans are auto-detected from <code>~/.claude/plans/</code></p>
+    </div>
+
+    <!-- Active plan view (hidden initially) -->
+    <div id="planView" style="display:none; flex:1; flex-direction:column; overflow:hidden;">
+      <div class="toolbar">
+        <span class="toolbar-info" id="planFileName"></span>
+        <span class="toolbar-info" id="planModified"></span>
+        <div class="toolbar-spacer"></div>
+        <button class="toolbar-btn" onclick="refreshCurrentPlan()">⟳ Refresh</button>
+      </div>
+      <div class="split-view">
+        <div class="markdown-pane" id="markdownPane">
+          <div class="md-content" id="mdContent"></div>
+        </div>
+        <div class="comments-pane" id="commentsPane">
+          <div class="comments-pane-header" id="commentsPaneHeader">Comments (0)</div>
+          <div class="global-comment-input">
+            <div id="globalCommentContext"></div>
+            <textarea id="globalCommentText" placeholder="Add a comment... (⌘+Enter to submit)" rows="4"></textarea>
+            <div class="global-comment-actions">
+              <button class="toolbar-btn" onclick="cancelComment()">Cancel</button>
+              <button class="toolbar-btn primary" onclick="submitGlobalComment()">Submit</button>
+            </div>
+          </div>
+          <div id="commentsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SELECTION TOOLTIP -->
+<div class="selection-tooltip" id="selectionTooltip">💬 Comment on selection</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+let currentPlanId = null;
+let currentPlan = null;
+let commentFormContext = {};
+let eventSource = null;
+
+// ===== THEME =====
+const THEME_CONFIG = {
+  dark: {
+    hljsUrl: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css',
+    mermaid: { bg: '#21262d', fg: '#e6edf3', line: '#6e7681', accent: '#58a6ff', surface: '#161b22', border: '#30363d' }
+  },
+  light: {
+    hljsUrl: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css',
+    mermaid: { bg: '#f0f2f5', fg: '#1f2328', line: '#8c959f', accent: '#0969da', surface: '#f6f8fa', border: '#d0d7de' }
+  }
+};
+
+function getCurrentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+function toggleTheme() {
+  const next = getCurrentTheme() === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  localStorage.setItem('theme', next);
+}
+
+function applyTheme(theme) {
+  // 1. Set/remove data attribute
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  // 2. Toggle icons
+  document.getElementById('themeIconSun').style.display = theme === 'dark' ? 'block' : 'none';
+  document.getElementById('themeIconMoon').style.display = theme === 'light' ? 'block' : 'none';
+  // 3. Swap highlight.js theme
+  document.getElementById('hljs-theme').href = THEME_CONFIG[theme].hljsUrl;
+  // 4. Re-render mermaid if a plan is loaded
+  if (currentPlan) reRenderMermaid(theme);
+}
+
+async function reRenderMermaid(theme) {
+  const mdPane = document.getElementById('mdContent');
+  const { renderMermaid } = beautifulMermaid;
+  const colors = THEME_CONFIG[theme || getCurrentTheme()].mermaid;
+  for (const div of mdPane.querySelectorAll('.mermaid')) {
+    const source = div.dataset.mermaidSource;
+    if (!source) continue;
+    try {
+      div.innerHTML = await renderMermaid(source, colors);
+    } catch (e) { console.warn('Mermaid re-render warning:', e); }
+  }
+}
+
+// ===== MARKED CONFIG =====
+const { markedHighlight } = globalThis.markedHighlight;
+
+marked.use(
+  markedHighlight({
+    langPrefix: 'hljs language-',
+    highlight(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    }
+  })
+);
+
+marked.use({ breaks: true, gfm: true });
+
+// Custom renderer to wrap sections and handle mermaid
+const renderer = new marked.Renderer();
+const originalHeading = renderer.heading;
+
+
+// ===== SSE CONNECTION =====
+function connectSSE() {
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource('/api/events');
+  
+  eventSource.addEventListener('connected', () => {
+    document.getElementById('statusDot').classList.remove('disconnected');
+    document.getElementById('statusText').textContent = 'Live';
+  });
+  
+  eventSource.addEventListener('file-change', (e) => {
+    const data = JSON.parse(e.data);
+    loadPlanList();
+    if (currentPlanId && data.file && data.file.includes(currentPlanId)) {
+      refreshCurrentPlan();
+    }
+    showToast(`📄 File updated: ${data.file}`);
+  });
+  
+  eventSource.addEventListener('comment-added', (e) => {
+    if (currentPlanId) refreshCurrentPlan();
+  });
+
+  eventSource.addEventListener('comment-deleted', (e) => {
+    if (currentPlanId) refreshCurrentPlan();
+  });
+  
+  eventSource.addEventListener('hook-trigger', (e) => {
+    loadPlanList();
+    showToast('🔔 Claude Code hook triggered');
+  });
+  
+  eventSource.onerror = () => {
+    document.getElementById('statusDot').classList.add('disconnected');
+    document.getElementById('statusText').textContent = 'Disconnected';
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// ===== API =====
+async function api(path, options = {}) {
+  const res = await fetch('/api' + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  return res.json();
+}
+
+// ===== PLAN LIST =====
+async function loadPlanList() {
+  const plans = await api('/plans');
+  const listEl = document.getElementById('planList');
+  
+  if (!plans || plans.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:0.85rem;">No plans yet. Switch Claude Code to plan mode to see plans here.</div>';
+    return;
+  }
+  
+  listEl.innerHTML = plans.map(p => `
+    <div class="plan-item ${p.id === currentPlanId ? 'active' : ''}" onclick="loadPlan('${p.id}')">
+      <div class="plan-item-name" title="${p.name}">${p.name}</div>
+      <div class="plan-item-meta">
+        <span>${timeAgo(p.modified)}</span>
+        ${p.commentCount > 0 ? `<span class="badge">${p.commentCount} 💬</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ===== LOAD & RENDER PLAN =====
+async function loadPlan(planId) {
+  currentPlanId = planId;
+  const plan = await api(`/plans/${encodeURIComponent(planId)}`);
+  if (!plan) return;
+  currentPlan = plan;
+  
+  // Show plan view
+  document.getElementById('emptyState').style.display = 'none';
+  const planView = document.getElementById('planView');
+  planView.style.display = 'flex';
+  
+  // Update toolbar
+  document.getElementById('planFileName').textContent = plan.name;
+  document.getElementById('planModified').textContent = `Modified: ${new Date(plan.modified).toLocaleString()}`;
+  
+  // Render markdown with section wrappers
+  renderMarkdown(plan.content, plan.comments);
+  
+  // Render comments pane
+  renderComments(plan.comments);
+  
+  // Update sidebar active state
+  loadPlanList();
+}
+
+async function refreshCurrentPlan() {
+  if (currentPlanId) await loadPlan(currentPlanId);
+}
+
+function renderMarkdown(content, comments) {
+  const mdPane = document.getElementById('mdContent');
+  
+  // First, render raw markdown
+  let html = marked.parse(content);
+  
+  // Wrap each heading section for comment triggers
+  // We'll post-process the HTML to add section wrappers
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  
+  const sections = [];
+  let currentSection = null;
+  
+  for (const node of [...tempDiv.childNodes]) {
+    const tagName = node.tagName ? node.tagName.toLowerCase() : '';
+    if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
+      if (currentSection) sections.push(currentSection);
+      currentSection = {
+        title: node.textContent,
+        tag: tagName,
+        elements: [node.outerHTML]
+      };
+    } else if (currentSection) {
+      currentSection.elements.push(node.outerHTML || node.textContent);
+    } else {
+      // Content before first heading
+      if (!currentSection) currentSection = { title: '', tag: '', elements: [] };
+      currentSection.elements.push(node.outerHTML || node.textContent);
+    }
+  }
+  if (currentSection) sections.push(currentSection);
+  
+  // Build final HTML with section wrappers
+  const commentsBySection = {};
+  for (const c of (comments || [])) {
+    const key = c.sectionTitle || '';
+    if (!commentsBySection[key]) commentsBySection[key] = [];
+    commentsBySection[key].push(c);
+  }
+  
+  let finalHtml = '';
+  for (const sec of sections) {
+    const hasComments = commentsBySection[sec.title]?.length > 0;
+    const count = commentsBySection[sec.title]?.length || 0;
+    finalHtml += `<div class="md-section ${hasComments ? 'has-comments' : ''}" data-section="${escapeAttr(sec.title)}">`;
+    if (sec.title) {
+      finalHtml += `<span class="comment-trigger ${hasComments ? 'has-comments' : ''}" 
+        onclick="openCommentForm(this, '${escapeAttr(sec.title)}')" 
+        title="${hasComments ? count + ' comment(s)' : 'Add comment'}">
+        ${hasComments ? count : '+'}
+      </span>`;
+    }
+    finalHtml += sec.elements.join('');
+    finalHtml += '</div>';
+  }
+  
+  mdPane.innerHTML = finalHtml;
+  
+  // Render mermaid diagrams, then highlight selections
+  requestAnimationFrame(async () => {
+    const mermaidBlocks = mdPane.querySelectorAll('pre code.language-mermaid');
+    for (const block of mermaidBlocks) {
+      const pre = block.parentElement;
+      const mermaidDiv = document.createElement('div');
+      mermaidDiv.className = 'mermaid';
+      mermaidDiv.textContent = block.textContent;
+      pre.replaceWith(mermaidDiv);
+    }
+
+    // Also check for ```mermaid blocks that marked may have rendered differently
+    const allCodeBlocks = mdPane.querySelectorAll('pre code');
+    for (const block of allCodeBlocks) {
+      const text = block.textContent.trim();
+      if (text.startsWith('graph ') || text.startsWith('sequenceDiagram') ||
+          text.startsWith('classDiagram') || text.startsWith('flowchart') ||
+          text.startsWith('erDiagram') || text.startsWith('gantt') ||
+          text.startsWith('pie') || text.startsWith('gitgraph') ||
+          text.startsWith('stateDiagram')) {
+        const pre = block.parentElement;
+        const mermaidDiv = document.createElement('div');
+        mermaidDiv.className = 'mermaid';
+        mermaidDiv.textContent = text;
+        pre.replaceWith(mermaidDiv);
+      }
+    }
+
+    const { renderMermaid } = beautifulMermaid;
+    const colors = THEME_CONFIG[getCurrentTheme()].mermaid;
+    const mermaidDivs = mdPane.querySelectorAll('.mermaid');
+    for (const div of mermaidDivs) {
+      try {
+        const source = div.textContent;
+        div.dataset.mermaidSource = source;
+        const svg = await renderMermaid(source, colors);
+        div.innerHTML = svg;
+      } catch (e) {
+        console.warn('Mermaid render warning:', e);
+        div.textContent = 'Diagram render error: ' + e.message;
+      }
+    }
+
+    // Highlight text selections from existing comments
+    highlightSelections(comments);
+  });
+}
+
+// ===== TEXT SELECTION HIGHLIGHTING =====
+function highlightSelections(comments) {
+  const mdPane = document.getElementById('mdContent');
+  if (!comments) return;
+
+  // Filter to unresolved comments that have selectedText
+  const selComments = comments.filter(c => c.selectedText && c.status !== 'resolved');
+  if (selComments.length === 0) return;
+
+  for (const comment of selComments) {
+    const needle = comment.selectedText;
+    const walker = document.createTreeWalker(mdPane, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        // Skip pre, code, mermaid elements
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        if (parent.closest('pre') || parent.closest('code') || parent.closest('.mermaid') || parent.closest('.text-selection-highlight')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    // Collect all text nodes for potential multi-node matching
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    // Try to find the needle across consecutive text nodes
+    let found = false;
+    for (let i = 0; i < textNodes.length && !found; i++) {
+      // Build a concatenated string from node i onward
+      let concat = '';
+      let nodeSpans = []; // { node, startInConcat, length }
+      for (let j = i; j < textNodes.length; j++) {
+        nodeSpans.push({ node: textNodes[j], startInConcat: concat.length, length: textNodes[j].textContent.length });
+        concat += textNodes[j].textContent;
+        const idx = concat.indexOf(needle);
+        if (idx !== -1) {
+          // Found it — wrap the matching range across involved nodes
+          wrapMatchAcrossNodes(nodeSpans, idx, needle.length, comment.id);
+          found = true;
+          break;
+        }
+        // Stop concatenating if we're well past any reasonable match
+        if (concat.length > needle.length * 3) break;
+      }
+    }
+  }
+}
+
+function wrapMatchAcrossNodes(nodeSpans, matchStart, matchLen, commentId) {
+  const matchEnd = matchStart + matchLen;
+  for (const span of nodeSpans) {
+    const nodeStart = span.startInConcat;
+    const nodeEnd = nodeStart + span.length;
+    // Check if this node overlaps with the match
+    const overlapStart = Math.max(matchStart, nodeStart);
+    const overlapEnd = Math.min(matchEnd, nodeEnd);
+    if (overlapStart >= overlapEnd) continue;
+
+    const localStart = overlapStart - nodeStart;
+    const localEnd = overlapEnd - nodeStart;
+    const textNode = span.node;
+    const text = textNode.textContent;
+
+    // Split: before | match | after
+    const before = text.slice(0, localStart);
+    const match = text.slice(localStart, localEnd);
+    const after = text.slice(localEnd);
+
+    const mark = document.createElement('mark');
+    mark.className = 'text-selection-highlight';
+    mark.dataset.commentId = commentId;
+    mark.textContent = match;
+    mark.onclick = () => scrollToCommentCard(commentId);
+
+    const parent = textNode.parentNode;
+    if (before) parent.insertBefore(document.createTextNode(before), textNode);
+    parent.insertBefore(mark, textNode);
+    if (after) parent.insertBefore(document.createTextNode(after), textNode);
+    parent.removeChild(textNode);
+  }
+}
+
+function scrollToCommentCard(commentId) {
+  const card = document.getElementById('card-' + commentId);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.style.borderColor = 'var(--accent-orange)';
+    setTimeout(() => card.style.borderColor = '', 2000);
+  }
+}
+
+// ===== COMMENTS =====
+function renderComments(comments) {
+  const header = document.getElementById('commentsPaneHeader');
+  const list = document.getElementById('commentsList');
+
+  const all = comments || [];
+
+  header.textContent = `Comments (${all.length})`;
+
+  if (all.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">No comments yet. Click the + button next to any section, or select text to add a review comment.</div>';
+    return;
+  }
+
+  list.innerHTML = all.map(c => {
+    const hasSelection = !!c.selectedText;
+    const selectionExcerpt = hasSelection ? (c.selectedText.length > 60 ? c.selectedText.slice(0, 60) + '...' : c.selectedText) : '';
+    // Context line: show selected text excerpt or section name
+    let contextHtml = '';
+    if (hasSelection) {
+      contextHtml = `<div class="comment-card-context">"${escapeHtml(selectionExcerpt)}"</div>`;
+    } else if (c.sectionTitle) {
+      contextHtml = `<div class="comment-card-context">Section: ${escapeHtml(c.sectionTitle)}</div>`;
+    }
+    return `
+    <div class="comment-card" id="card-${c.id}">
+      <button class="comment-card-delete" onclick="deleteComment('${c.id}')" title="Delete comment">✕</button>
+      <div class="comment-card-header">
+        <span class="comment-type-badge ${c.type}">${c.type}</span>
+      </div>
+      ${contextHtml}
+      <div class="comment-card-text">${escapeHtml(c.text)}</div>
+      <div class="comment-card-time">${timeAgo(c.createdAt)}</div>
+      <div class="comment-card-actions">
+        ${hasSelection
+          ? `<button onclick="scrollToHighlight('${c.id}')">↗ Go to highlight</button>`
+          : (c.sectionTitle ? `<button onclick="scrollToSection('${escapeAttr(c.sectionTitle)}')">↗ Go to section</button>` : '')
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== COMMENT FORM (routes to sidebar) =====
+function openCommentForm(trigger, sectionTitle, selectedText) {
+  const contextEl = document.getElementById('globalCommentContext');
+  const textarea = document.getElementById('globalCommentText');
+
+  if (selectedText) {
+    const excerpt = selectedText.length > 80 ? selectedText.slice(0, 80) + '...' : selectedText;
+    contextEl.textContent = `📝 "${excerpt}"`;
+  } else {
+    contextEl.textContent = `📌 Section: ${sectionTitle}`;
+  }
+  contextEl.classList.add('visible');
+
+  commentFormContext = { sectionTitle, selectedText: selectedText || '' };
+  textarea.focus();
+}
+
+function cancelComment() {
+  const contextEl = document.getElementById('globalCommentContext');
+  const textarea = document.getElementById('globalCommentText');
+  contextEl.classList.remove('visible');
+  contextEl.textContent = '';
+  textarea.value = '';
+  commentFormContext = {};
+}
+
+async function deleteComment(commentId) {
+  await api(`/comments/${commentId}/delete`, {
+    method: 'POST',
+    body: JSON.stringify({ planId: currentPlanId })
+  });
+  refreshCurrentPlan();
+}
+
+async function submitGlobalComment() {
+  const textarea = document.getElementById('globalCommentText');
+  const text = textarea.value.trim();
+  if (!text || !currentPlanId) return;
+
+  await api(`/plans/${encodeURIComponent(currentPlanId)}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({
+      text,
+      type: 'comment',
+      sectionTitle: commentFormContext.sectionTitle || '',
+      selectedText: commentFormContext.selectedText || ''
+    })
+  });
+
+  textarea.value = '';
+  // Clear context
+  const contextEl = document.getElementById('globalCommentContext');
+  contextEl.classList.remove('visible');
+  contextEl.textContent = '';
+  commentFormContext = {};
+
+  showToast('💬 Comment added & written to plan file');
+  refreshCurrentPlan();
+}
+
+function scrollToSection(title) {
+  if (!title) return;
+  const sections = document.querySelectorAll('.md-section');
+  for (const sec of sections) {
+    if (sec.dataset.section === title) {
+      sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      sec.style.borderLeftColor = 'var(--accent-blue)';
+      setTimeout(() => sec.style.borderLeftColor = '', 2000);
+      break;
+    }
+  }
+}
+
+function scrollToHighlight(commentId) {
+  const mark = document.querySelector(`.text-selection-highlight[data-comment-id="${commentId}"]`);
+  if (mark) {
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    mark.style.background = 'rgba(210, 153, 34, 0.5)';
+    setTimeout(() => mark.style.background = '', 2000);
+  }
+}
+
+// ===== UTILITIES =====
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escapeAttr(str) {
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+function timeAgo(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 3000);
+}
+
+// ===== TEXT SELECTION DETECTION =====
+let pendingSelectionText = '';
+
+document.getElementById('markdownPane')?.addEventListener('mouseup', (e) => {
+  // Delay slightly so the selection is finalized
+  setTimeout(() => handleTextSelection(e), 10);
+});
+
+function handleTextSelection(e) {
+  const tooltip = document.getElementById('selectionTooltip');
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) {
+    tooltip.classList.remove('visible');
+    return;
+  }
+
+  const text = sel.toString().trim();
+  if (text.length < 3) {
+    tooltip.classList.remove('visible');
+    return;
+  }
+
+  // Make sure selection is within the markdown content
+  const mdContent = document.getElementById('mdContent');
+  const anchorInMd = mdContent.contains(sel.anchorNode);
+  const focusInMd = mdContent.contains(sel.focusNode);
+  if (!anchorInMd || !focusInMd) {
+    tooltip.classList.remove('visible');
+    return;
+  }
+
+  // Don't show tooltip if selection is inside pre/code
+  const anchorParent = sel.anchorNode.parentElement;
+  if (anchorParent && (anchorParent.closest('pre') || anchorParent.closest('code'))) {
+    tooltip.classList.remove('visible');
+    return;
+  }
+
+  pendingSelectionText = text;
+
+  // Position tooltip above the selection
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  tooltip.style.top = (rect.top - 40) + 'px';
+  tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+  tooltip.classList.add('visible');
+}
+
+document.getElementById('selectionTooltip').addEventListener('mousedown', (e) => {
+  e.preventDefault(); // Prevent losing the selection
+});
+
+document.getElementById('selectionTooltip').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const tooltip = document.getElementById('selectionTooltip');
+  tooltip.classList.remove('visible');
+
+  if (!pendingSelectionText) return;
+
+  // Find the section this selection belongs to
+  const sel = window.getSelection();
+  let sectionTitle = '';
+  if (sel && sel.anchorNode) {
+    const sectionEl = sel.anchorNode.parentElement?.closest('.md-section');
+    if (sectionEl) sectionTitle = sectionEl.dataset.section || '';
+  }
+
+  // Clear the browser selection
+  sel.removeAllRanges();
+
+  // Route to sidebar input
+  const selectedText = pendingSelectionText;
+  pendingSelectionText = '';
+  openCommentForm(null, sectionTitle, selectedText);
+});
+
+// Dismiss tooltip on scroll
+document.getElementById('markdownPane')?.addEventListener('scroll', () => {
+  document.getElementById('selectionTooltip').classList.remove('visible');
+});
+
+// Escape dismisses tooltip and cancels comment context; CMD+Enter submits
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    cancelComment();
+    document.getElementById('selectionTooltip').classList.remove('visible');
+  }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (document.activeElement === document.getElementById('globalCommentText')) {
+      submitGlobalComment();
+    }
+  }
+});
+
+// Hide tooltip when clicking outside it (unless it's a selection event)
+document.addEventListener('click', (e) => {
+  const tooltip = document.getElementById('selectionTooltip');
+  if (!tooltip.contains(e.target) && !window.getSelection()?.toString().trim()) {
+    tooltip.classList.remove('visible');
+  }
+});
+
+// ===== INIT =====
+async function init() {
+  applyTheme(localStorage.getItem('theme') || 'dark');
+  connectSSE();
+  await loadPlanList();
+  
+  // Load session info
+  const session = await api('/session');
+  if (session) {
+    document.getElementById('sessionInfo').textContent = `Session: ${session.session?.slice(0, 8)}...`;
+  }
+  
+  // Auto-load first plan if available
+  const plans = await api('/plans');
+  if (plans && plans.length > 0) {
+    loadPlan(plans[0].id);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

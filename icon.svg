@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="108" fill="#ffffff"/>
+
+  <!-- Document page -->
+  <path d="M168 80h112l80 80v272a16 16 0 0 1-16 16H168a16 16 0 0 1-16-16V96a16 16 0 0 1 16-16z" fill="#f6f8fa" stroke="#d0d7de" stroke-width="6"/>
+
+  <!-- Folded corner -->
+  <path d="M280 80v64a16 16 0 0 0 16 16h64" fill="#e1e4e8" stroke="#d0d7de" stroke-width="6"/>
+
+  <!-- Text lines on document -->
+  <rect x="192" y="192" width="160" height="8" rx="4" fill="#58a6ff" opacity="0.9"/>
+  <rect x="192" y="220" width="120" height="8" rx="4" fill="#8c959f" opacity="0.5"/>
+  <rect x="192" y="248" width="140" height="8" rx="4" fill="#8c959f" opacity="0.5"/>
+  <rect x="192" y="276" width="100" height="8" rx="4" fill="#8c959f" opacity="0.5"/>
+  <rect x="192" y="316" width="150" height="8" rx="4" fill="#58a6ff" opacity="0.6"/>
+  <rect x="192" y="344" width="110" height="8" rx="4" fill="#8c959f" opacity="0.5"/>
+  <rect x="192" y="372" width="130" height="8" rx="4" fill="#8c959f" opacity="0.5"/>
+
+  <!-- Magnifying glass -->
+  <circle cx="360" cy="340" r="60" fill="none" stroke="#58a6ff" stroke-width="12"/>
+  <line x1="402" y1="382" x2="440" y2="420" stroke="#58a6ff" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Eye inside magnifying glass -->
+  <ellipse cx="360" cy="340" rx="28" ry="18" fill="none" stroke="#58a6ff" stroke-width="5" opacity="0.8"/>
+  <circle cx="360" cy="340" r="8" fill="#58a6ff" opacity="0.9"/>
+</svg>
