@@ -5,7 +5,7 @@
 # This script:
 # 1. Creates necessary directories
 # 2. Auto-installs hooks in Claude Code settings
-# 3. Appends review instructions to CLAUDE.md
+# 3. Copies plan_viewer.md and adds reference in CLAUDE.md
 # 4. Creates a sample plan for testing
 # 5. Starts the Python server
 #
@@ -150,17 +150,20 @@ else:
     print("   ✓ Hooks already present (skipped)")
 PYEOF
 
-# 4. Append review instructions to CLAUDE.md
+# 4. Copy plan_viewer.md and add reference in CLAUDE.md
 echo ""
 echo "📝 CLAUDE.md integration..."
 
-MARKER="## Plan Review Comments"
-if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER" "$CLAUDE_MD"; then
-  echo "   ✓ Review instructions already present (skipped)"
+cp "$SCRIPT_DIR/plan_viewer.md" "$CLAUDE_DIR/plan_viewer.md"
+echo "   ✓ Copied plan_viewer.md to $CLAUDE_DIR/plan_viewer.md"
+
+REFERENCE_LINE="Read ~/.claude/plan_viewer.md for Plan Viewer integration instructions."
+if [ -f "$CLAUDE_MD" ] && grep -qF "$REFERENCE_LINE" "$CLAUDE_MD"; then
+  echo "   ✓ Reference already in CLAUDE.md (skipped)"
 else
   echo "" >> "$CLAUDE_MD"
-  cat "$SCRIPT_DIR/CLAUDE.md" >> "$CLAUDE_MD"
-  echo "   ✓ Appended review instructions to $CLAUDE_MD"
+  echo "$REFERENCE_LINE" >> "$CLAUDE_MD"
+  echo "   ✓ Added reference to $CLAUDE_MD"
 fi
 
 # 5. Create a sample plan for testing

@@ -16,8 +16,8 @@ A browser-based viewer for Claude Code plans — view, annotate, and comment on 
 │                  │     │                  │     │                  │
 │  Creates/updates │     │  Watches files   │     │  View plans      │
 │  plan .md files  │     │  Serves UI       │     │  Add comments    │
-│  Reads comments  │     │  Manages reviews │     │  Approve/reject  │
-│  Revises plans   │     │  SSE live reload │     │  Mermaid render  │
+│  Reads comments  │     │  Manages reviews │     │  Mermaid render  │
+│  Revises plans   │     │  SSE live reload │     │                  │
 │                  │     │                  │     │                  │
 └──────────────────┘     └──────────────────┘     └──────────────────┘
 ```
@@ -26,7 +26,7 @@ A browser-based viewer for Claude Code plans — view, annotate, and comment on 
 
 1. **Claude Code** creates a plan in `~/.claude/plans/` (use plan mode: `Shift+Tab`)
 2. **Plan Viewer** auto-detects the file and renders it in the browser with Mermaid diagrams
-3. **You** review the plan — click section `+` buttons for section-level comments, or select text for inline comments (💬 Comment, 💡 Suggestion, ❓ Question, ✅ Approve, ❌ Reject)
+3. **You** review the plan — click section `+` buttons for section-level comments, or select text for inline comments
 4. Comments are **written back into the plan `.md` file** under a `## 📝 Review Comments` section
 5. **Claude Code** reads the updated plan (it re-reads plan files), sees your comments, and revises accordingly
 6. Tell Claude: *"Check the plan file for review comments and address them"*
@@ -38,7 +38,7 @@ A browser-based viewer for Claude Code plans — view, annotate, and comment on 
 git clone git@github.com:mekalz/plan_viewer.git ~/plan-viewer
 cd ~/plan-viewer
 
-# Run setup (creates dirs, installs hooks, appends CLAUDE.md, starts server)
+# Run setup (creates dirs, installs hooks, adds CLAUDE.md reference, starts server)
 bash setup.sh
 
 # Open in browser
@@ -50,7 +50,7 @@ open http://localhost:3456
 The setup script handles everything automatically:
 - Creates `~/.claude/plans/` and `~/.claude/plan-reviews/` directories
 - Installs Claude Code hooks into `~/.claude/settings.json` (Stop + PostToolUse)
-- Appends review instructions to `~/.claude/CLAUDE.md`
+- Copies `plan_viewer.md` to `~/.claude/` and adds a reference in `~/.claude/CLAUDE.md`
 - Creates a sample plan for testing
 - Starts the server on port 3456
 
@@ -106,16 +106,16 @@ For real-time notifications when Claude finishes a task, add hooks to `~/.claude
 
 ### 3. CLAUDE.md Integration
 
-So Claude Code understands how to respond to your review comments, append the review instructions to your global CLAUDE.md:
+So Claude Code understands how to respond to your review comments, copy `plan_viewer.md` and add a reference in your global CLAUDE.md:
 
 ```bash
-cat ~/plan-viewer/CLAUDE.md >> ~/.claude/CLAUDE.md
+cp ~/plan-viewer/plan_viewer.md ~/.claude/plan_viewer.md
+echo "Read ~/.claude/plan_viewer.md for Plan Viewer integration instructions." >> ~/.claude/CLAUDE.md
 ```
 
 This teaches Claude to:
 - Recognize the `## 📝 Review Comments` section
-- Understand comment types (approve/reject/suggestion/question)
-- Respond appropriately to each type
+- Respond appropriately to reviewer comments
 
 ## Usage Workflow
 
@@ -137,16 +137,6 @@ claude
 # Tell Claude: "Read the review comments in the plan file and revise"
 ```
 
-### Comment Types
-
-| Type | Emoji | Effect |
-|------|-------|--------|
-| **Comment** | 💬 | General feedback for Claude to consider |
-| **Suggestion** | 💡 | Specific change request with details |
-| **Question** | ❓ | Claude should answer in the plan |
-| **Approve** | ✅ | Section/plan is good, proceed |
-| **Reject** | ❌ | Needs significant revision before proceeding |
-
 ### What Gets Written to Plan Files
 
 When you add a section-level comment, it's appended under a Review Comments section:
@@ -156,7 +146,7 @@ When you add a section-level comment, it's appended under a Review Comments sect
 
 ## 📝 Review Comments
 
-### 💡 SUGGESTION (re: "Database Design")
+### 💬 COMMENT (re: "Database Design")
 
 > Consider using a composite index on (user_id, created_at)
 > for the sessions table to optimize timeline queries.
@@ -210,7 +200,7 @@ plan-viewer/
 ├── setup.sh           # One-click setup & uninstall
 ├── notify.sh          # Claude Code hook script
 ├── icon.svg           # Project logo
-├── CLAUDE.md          # Review instructions for Claude Code
+├── plan_viewer.md     # Review instructions for Claude Code
 ├── CONTRIBUTING.md    # Contribution guidelines
 ├── LICENSE            # MIT License
 └── README.md
