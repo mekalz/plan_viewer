@@ -387,6 +387,124 @@
   }
   .md-content .mermaid svg { max-width: 100%; }
 
+  /* ===== OUTLINE PANE ===== */
+  .outline-pane {
+    width: 200px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-primary);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: width 0.2s;
+    position: relative;
+  }
+  .outline-pane.collapsed {
+    width: 36px;
+  }
+  .outline-pane.resizing {
+    transition: none;
+    user-select: none;
+  }
+  .outline-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    transition: background 0.15s;
+  }
+  .outline-resize-handle:hover,
+  .outline-resize-handle.dragging {
+    background: var(--accent-blue);
+  }
+  .outline-pane.collapsed .outline-resize-handle {
+    display: none;
+  }
+  .outline-pane.collapsed .outline-nav,
+  .outline-pane.collapsed .outline-title {
+    display: none;
+  }
+  .outline-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .outline-pane.collapsed .outline-header {
+    padding: 12px 8px;
+    justify-content: center;
+    border-bottom: none;
+  }
+  .outline-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .outline-toggle {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .outline-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+  .outline-toggle svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s;
+  }
+  .outline-pane.collapsed .outline-toggle svg {
+    transform: rotate(180deg);
+  }
+  .outline-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .outline-item {
+    display: block;
+    padding: 4px 16px;
+    border-left: 2px solid transparent;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s, border-left-color 0.15s, background 0.15s;
+  }
+  .outline-item:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+  .outline-item.active {
+    color: var(--accent-blue);
+    border-left-color: var(--accent-blue);
+  }
+  .outline-h1 { padding-left: 16px; }
+  .outline-h2 { padding-left: 28px; }
+  .outline-h3 { padding-left: 40px; }
+
+  .heading-highlight {
+    transition: background 0.3s;
+  }
+
   /* ===== LINE-LEVEL COMMENT MARKERS ===== */
   .md-section {
     position: relative;
@@ -728,6 +846,18 @@
         <button class="toolbar-btn" onclick="refreshCurrentPlan()">⟳ Refresh</button>
       </div>
       <div class="split-view">
+        <div class="outline-pane" id="outlinePane" style="display:none">
+          <div class="outline-header">
+            <span class="outline-title">On this page</span>
+            <button class="outline-toggle" id="outlineToggle" onclick="toggleOutline()" title="Toggle outline">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+          </div>
+          <nav class="outline-nav" id="outlineNav"></nav>
+          <div class="outline-resize-handle" id="outlineResizeHandle"></div>
+        </div>
         <div class="markdown-pane" id="markdownPane">
           <div class="md-content" id="mdContent"></div>
         </div>
@@ -934,27 +1064,51 @@ async function refreshCurrentPlan() {
   if (currentPlanId) await loadPlan(currentPlanId);
 }
 
+function slugify(text) {
+  return text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+}
+
+let outlineObserver = null;
+
 function renderMarkdown(content, comments) {
   const mdPane = document.getElementById('mdContent');
-  
+
+  // Disconnect previous outline observer
+  if (outlineObserver) {
+    outlineObserver.disconnect();
+    outlineObserver = null;
+  }
+
   // First, render raw markdown
   let html = marked.parse(content);
-  
+
   // Wrap each heading section for comment triggers
   // We'll post-process the HTML to add section wrappers
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = html;
-  
+
   const sections = [];
   let currentSection = null;
-  
+  const headingIdCounts = {};
+
   for (const node of [...tempDiv.childNodes]) {
     const tagName = node.tagName ? node.tagName.toLowerCase() : '';
     if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
+      // Generate unique heading ID
+      let slug = slugify(node.textContent);
+      if (headingIdCounts[slug] !== undefined) {
+        headingIdCounts[slug]++;
+        slug = slug + '-' + headingIdCounts[slug];
+      } else {
+        headingIdCounts[slug] = 0;
+      }
+      node.id = slug;
+
       if (currentSection) sections.push(currentSection);
       currentSection = {
         title: node.textContent,
         tag: tagName,
+        headingId: slug,
         elements: [node.outerHTML]
       };
     } else if (currentSection) {
@@ -992,7 +1146,10 @@ function renderMarkdown(content, comments) {
   }
   
   mdPane.innerHTML = finalHtml;
-  
+
+  // Build document outline
+  buildOutline(sections);
+
   // Render mermaid diagrams, then highlight selections
   requestAnimationFrame(async () => {
     const mermaidBlocks = mdPane.querySelectorAll('pre code.language-mermaid');
@@ -1040,6 +1197,131 @@ function renderMarkdown(content, comments) {
     highlightSelections(comments);
   });
 }
+
+// ===== DOCUMENT OUTLINE =====
+function buildOutline(sections) {
+  const outlinePane = document.getElementById('outlinePane');
+  const outlineNav = document.getElementById('outlineNav');
+
+  const headingSections = sections.filter(s => s.headingId && s.tag);
+  if (headingSections.length === 0) {
+    outlinePane.style.display = 'none';
+    return;
+  }
+
+  outlineNav.innerHTML = headingSections.map(s =>
+    `<a class="outline-item outline-${s.tag}" data-heading-id="${s.headingId}" onclick="scrollToHeading('${s.headingId}')" title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</a>`
+  ).join('');
+
+  outlinePane.style.display = 'flex';
+
+  // Restore collapsed/width state
+  if (localStorage.getItem('outline-collapsed') === 'true') {
+    outlinePane.classList.add('collapsed');
+    outlinePane.style.width = '';
+  } else {
+    const savedWidth = localStorage.getItem('outline-width');
+    if (savedWidth) outlinePane.style.width = savedWidth + 'px';
+  }
+
+  setupOutlineScrollTracking();
+}
+
+function scrollToHeading(headingId) {
+  const el = document.getElementById(headingId);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Brief highlight flash
+  el.classList.add('heading-highlight');
+  el.style.background = 'rgba(88, 166, 255, 0.1)';
+  setTimeout(() => {
+    el.style.background = '';
+    el.classList.remove('heading-highlight');
+  }, 1500);
+}
+
+function setupOutlineScrollTracking() {
+  const mdPane = document.getElementById('markdownPane');
+  const headings = mdPane.querySelectorAll('h1[id], h2[id], h3[id]');
+  if (headings.length === 0) return;
+
+  outlineObserver = new IntersectionObserver((entries) => {
+    // Find the topmost visible heading
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        setActiveOutlineItem(entry.target.id);
+      }
+    }
+  }, {
+    root: mdPane,
+    rootMargin: '0px 0px -70% 0px',
+    threshold: 0
+  });
+
+  for (const h of headings) {
+    outlineObserver.observe(h);
+  }
+}
+
+function setActiveOutlineItem(headingId) {
+  const outlineNav = document.getElementById('outlineNav');
+  const items = outlineNav.querySelectorAll('.outline-item');
+  for (const item of items) {
+    item.classList.toggle('active', item.dataset.headingId === headingId);
+  }
+
+  // Scroll active item into view within outline nav
+  const activeItem = outlineNav.querySelector('.outline-item.active');
+  if (activeItem) {
+    activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function toggleOutline() {
+  const outlinePane = document.getElementById('outlinePane');
+  outlinePane.classList.toggle('collapsed');
+  const isCollapsed = outlinePane.classList.contains('collapsed');
+  localStorage.setItem('outline-collapsed', isCollapsed);
+  if (!isCollapsed) {
+    // Restore saved width when expanding
+    const savedWidth = localStorage.getItem('outline-width');
+    if (savedWidth) outlinePane.style.width = savedWidth + 'px';
+  } else {
+    outlinePane.style.width = '';
+  }
+}
+
+// Outline resize drag
+(function() {
+  const handle = document.getElementById('outlineResizeHandle');
+  const pane = document.getElementById('outlinePane');
+  let startX, startWidth;
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startWidth = pane.getBoundingClientRect().width;
+    pane.classList.add('resizing');
+    handle.classList.add('dragging');
+
+    function onMouseMove(e) {
+      const newWidth = Math.min(Math.max(startWidth + (e.clientX - startX), 120), 500);
+      pane.style.width = newWidth + 'px';
+    }
+
+    function onMouseUp() {
+      pane.classList.remove('resizing');
+      handle.classList.remove('dragging');
+      localStorage.setItem('outline-width', Math.round(pane.getBoundingClientRect().width));
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  });
+})();
 
 // ===== TEXT SELECTION HIGHLIGHTING =====
 function highlightSelections(comments) {
@@ -1388,6 +1670,12 @@ document.addEventListener('click', (e) => {
 // ===== INIT =====
 async function init() {
   applyTheme(localStorage.getItem('theme') || 'dark');
+
+  // Restore outline collapsed state
+  if (localStorage.getItem('outline-collapsed') === 'true') {
+    document.getElementById('outlinePane').classList.add('collapsed');
+  }
+
   connectSSE();
   await loadPlanList();
   
