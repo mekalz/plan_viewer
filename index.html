@@ -10,7 +10,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked-highlight/2.2.2/index.umd.min.js"></script>
-<script src="https://unpkg.com/beautiful-mermaid/dist/beautiful-mermaid.browser.global.js"></script>
 <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
 
 <script>
@@ -886,6 +885,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ===== MERMAID (ESM dynamic import) =====
+const beautifulMermaid = import('https://esm.sh/beautiful-mermaid@1.0.0');
+
 // ===== STATE =====
 let currentPlanId = null;
 let currentPlan = null;
@@ -932,13 +934,13 @@ function applyTheme(theme) {
 
 async function reRenderMermaid(theme) {
   const mdPane = document.getElementById('mdContent');
-  const { renderMermaid } = beautifulMermaid;
+  const { renderMermaidSVGAsync } = await beautifulMermaid;
   const colors = THEME_CONFIG[theme || getCurrentTheme()].mermaid;
   for (const div of mdPane.querySelectorAll('.mermaid')) {
     const source = div.dataset.mermaidSource;
     if (!source) continue;
     try {
-      div.innerHTML = await renderMermaid(source, colors);
+      div.innerHTML = await renderMermaidSVGAsync(source, colors);
     } catch (e) { console.warn('Mermaid re-render warning:', e); }
   }
 }
@@ -1178,14 +1180,14 @@ function renderMarkdown(content, comments) {
       }
     }
 
-    const { renderMermaid } = beautifulMermaid;
+    const { renderMermaidSVGAsync } = await beautifulMermaid;
     const colors = THEME_CONFIG[getCurrentTheme()].mermaid;
     const mermaidDivs = mdPane.querySelectorAll('.mermaid');
     for (const div of mermaidDivs) {
       try {
         const source = div.textContent;
         div.dataset.mermaidSource = source;
-        const svg = await renderMermaid(source, colors);
+        const svg = await renderMermaidSVGAsync(source, colors);
         div.innerHTML = svg;
       } catch (e) {
         console.warn('Mermaid render warning:', e);
